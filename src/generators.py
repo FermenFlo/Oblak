@@ -1,4 +1,4 @@
-from .partition import Partition
+from src.partition import Partition
 from cached_property import cached_property
 from itertools import chain
 
