@@ -11,13 +11,13 @@ class Partition:
         args = args or (0,)
 
         if isinstance(args[0], Partition):
-            self.parts = args[0].parts
+            self.parts = args[0].parts  # already a tuple by construction
 
         elif isinstance(args[0], (list, tuple)):
-            self.parts = tuple(sorted(args[0], reverse=True))  # cast as tuple
+            self.parts = tuple(sorted([x for x in args[0] if x], reverse=True))  # cast as tuple
 
         else:
-            self.parts = tuple(sorted((int(x) for x in args), reverse=True))
+            self.parts = tuple(sorted((int(x) for x in args if x), reverse=True))  # cast as tuple
 
         self.iter_index = -1
         self.end = len(self.parts)
@@ -200,7 +200,7 @@ class Partition:
 
     @cached_property
     def box_size(self):
-        if not self.is_stable:
+        if not self or self.is_stable:
             return 0
 
         if len(self) == 1:
@@ -294,12 +294,41 @@ class Partition:
         """ https://arxiv.org/pdf/1409.2192.pdf (Denoted as 'r sub p' in the paper). """
         return (-np.diff(self).clip(-2, 0).sum() // 2) + 1
 
+    @cached_property
     def is_almost_rectangular(self):
         """ https://arxiv.org/pdf/1409.2192.pdf """
         if len(self) < 2:
             return False
 
         return (self[0] - self[-1]) <= 1
+
+    @cached_property
+    def hook_length(self):
+        """ https://en.wikipedia.org/wiki/Young_tableau#Arm_and_leg_length """
+        return self[0] + len(self) + 1 if self else 0
+
+    @cached_property
+    def num_corners(self):
+        """ https://en.wikipedia.org/wiki/Hook_length_formula#Probabilistic_proof_using_the_hook_walk """
+        matrix = self.matrix
+        corner_count = 0
+
+        for i, row in enumerate(matrix):
+            non_zeros = np.nonzero(row)[0]
+            if not non_zeros.any():
+                break  # breaking is allowed by definition of partitions (they dont have "gaps")
+
+            last_non_zero_index = non_zeros[-1]
+
+            try:
+                # check below (to the right is guaranteeed to be empty by construction)
+                if not matrix[i + 1][last_non_zero_index]:
+                    corner_count += 1
+
+            except IndexError:  # must have been last row (which is a corner by definition)
+                corner_count += 1
+
+        return corner_count
 
     @cached_property
     def oblak(self):
@@ -360,5 +389,5 @@ class Partition:
                 )
 
                 oblak_value = max_u_chain_value
-
         return oblak_value, partition
+
